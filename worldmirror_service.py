@@ -1,6 +1,7 @@
 import argparse
 import base64
 import io
+import os
 import uuid
 from typing import Any, Dict, Optional
 
@@ -21,6 +22,9 @@ except Exception as exc:
 from src.models.models.worldmirror import WorldMirror
 
 
+DEFAULT_LOCAL_MODEL_PATH = "/home/jiangbaoyang/HuggingFace-Download-Accelerator/hf_hub/HunyuanWorld-Mirror"
+
+
 class Build3DGSRequest(BaseModel):
     image_base64: str
 
@@ -38,8 +42,10 @@ class PredictPoseRequest(BaseModel):
 
 
 class WorldMirrorService:
-    def __init__(self, model_id: str = "tencent/HunyuanWorld-Mirror", target_size: int = 518):
+    def __init__(self, model_id: str = DEFAULT_LOCAL_MODEL_PATH, target_size: int = 518):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if not model_id:
+            raise ValueError("model_id cannot be empty")
         self.model = WorldMirror.from_pretrained(model_id).to(self.device)
         self.model.eval()
         self.target_size = target_size
@@ -196,9 +202,14 @@ def main():
     parser = argparse.ArgumentParser(description="Run HunyuanWorld-Mirror local service for Lingbot")
     parser.add_argument("--host", type=str, default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18080)
-    parser.add_argument("--model_id", type=str, default="tencent/HunyuanWorld-Mirror")
+    parser.add_argument("--model_id", type=str, default=DEFAULT_LOCAL_MODEL_PATH)
     parser.add_argument("--target_size", type=int, default=518)
     args = parser.parse_args()
+
+    if not os.path.exists(args.model_id):
+        raise FileNotFoundError(
+            f"Local model path not found: {args.model_id}. Please set --model_id to an existing local directory."
+        )
 
     service = WorldMirrorService(model_id=args.model_id, target_size=args.target_size)
     app = create_app(service)
